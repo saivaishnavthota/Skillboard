@@ -1,0 +1,2 @@
+"""Skillboard backend application."""
+

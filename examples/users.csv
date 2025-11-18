@@ -1,0 +1,7 @@
+employee_id,first_name,last_name,company_email,department,role
+E001,Sai,Vaishnav,sai.vaishnav@company.com,Engineering,Developer
+E002,Anita,Sharma,anita.sharma@company.com,Marketing,Manager
+E003,John,Doe,john.doe@company.com,Sales,Representative
+E004,Jane,Smith,jane.smith@company.com,Engineering,Senior Developer
+E005,Bob,Johnson,bob.johnson@company.com,HR,Recruiter
+

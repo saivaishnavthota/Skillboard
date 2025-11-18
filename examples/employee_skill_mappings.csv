@@ -1,0 +1,12 @@
+employee_id,skill_name,rating,years_experience,notes
+E001,React,advanced,3,Used in recent projects
+E002,Python,intermediate,1.5,Learning on the job
+E001,JavaScript,advanced,4,Primary language
+E003,Salesforce,intermediate,2,CRM platform
+E004,TypeScript,advanced,3,Preferred for new projects
+E005,Recruitment,advanced,5,Core competency
+E001,Node.js,intermediate,2,Backend development
+E002,Marketing Analytics,advanced,3,Data-driven campaigns
+E003,Communication,advanced,6,Client relations
+E004,Docker,intermediate,1,Containerization
+
