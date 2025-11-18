@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: skillboard
       POSTGRES_DB: skillboard
     ports:
-      - "5433:5433"
+      - "2609:2609"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,9 +24,9 @@ services:
       dockerfile: Dockerfile
     container_name: skillboard-backend
     environment:
-      DATABASE_URL: postgresql://skillboard:skillboard@postgres:5432/skillboard
+      DATABASE_URL: postgresql://skillboard:skillboard@postgres:2609/skillboard
     ports:
-      - "8000:8000"
+      - "2608:2608"
     volumes:
       - ./backend:/app
     depends_on:
@@ -34,7 +34,7 @@ services:
         condition: service_healthy
     # Removed --reload to avoid memory issues in Docker
     # To apply code changes, restart: docker-compose restart backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 2608
 
   frontend:
     build:
@@ -42,17 +42,17 @@ services:
       dockerfile: Dockerfile
     container_name: skillboard-frontend
     ports:
-      - "5173:5173"
+      - "2607:2607"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:2608
     # For development, use dev server instead of preview
     # Use --host 0.0.0.0 to allow external connections
-    command: npm run dev -- --host 0.0.0.0 --port 5173
+    command: npm run dev -- --host 0.0.0.0 --port 2607
 
 volumes:
   postgres_data:
