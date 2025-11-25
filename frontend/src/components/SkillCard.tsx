@@ -19,6 +19,8 @@ interface SkillCardProps {
   onRatingChange?: (skillId: number, rating: 'Beginner' | 'Developing' | 'Intermediate' | 'Advanced' | 'Expert') => void;
   showRating?: boolean;
   columnType?: 'existing' | 'interested';
+  onRemove?: () => void;
+  showRemove?: boolean;
 }
 
 export const SkillCard: React.FC<SkillCardProps> = ({
@@ -26,6 +28,8 @@ export const SkillCard: React.FC<SkillCardProps> = ({
   onRatingChange,
   showRating = false,
   columnType,
+  onRemove,
+  showRemove = false,
 }) => {
   const {
     attributes,
@@ -66,7 +70,7 @@ export const SkillCard: React.FC<SkillCardProps> = ({
       {...attributes}
       {...listeners}
       className={`
-        bg-white rounded-lg shadow-md p-4 mb-2 cursor-grab active:cursor-grabbing
+        bg-white rounded-lg shadow-md p-4 mb-2 cursor-grab active:cursor-grabbing relative
         border-2 transition-colors
         ${isDragging ? 'shadow-lg border-blue-400' : isOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-400'}
       `}
@@ -97,15 +101,33 @@ export const SkillCard: React.FC<SkillCardProps> = ({
             </p>
           )}
         </div>
-        {showRating && (
-          <div className="ml-4">
-            <RatingPicker
-              value={skill.rating || 'Beginner'}
-              onChange={handleRatingChange}
-            />
-          </div>
-        )}
+        <div className="ml-4">
+          {showRating && (
+            <div>
+              <RatingPicker
+                value={skill.rating || 'Beginner'}
+                onChange={handleRatingChange}
+              />
+            </div>
+          )}
+        </div>
       </div>
+      {onRemove && showRemove && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
+          onPointerDown={(e) => { e.stopPropagation(); }}
+          onMouseDown={(e) => { e.stopPropagation(); }}
+          className="absolute -top-2 -right-2 z-20 p-1 rounded-full bg-white hover:bg-gray-100 border border-gray-300 shadow"
+          aria-label="Remove skill"
+          title="Remove skill"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-700">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 };

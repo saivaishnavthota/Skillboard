@@ -50,6 +50,7 @@ export const EmployeeDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [allowRemove, setAllowRemove] = useState(true);
   const [user, setUser] = useState(authApi.getUser());
   const navigate = useNavigate();
 
@@ -103,27 +104,45 @@ export const EmployeeDashboard: React.FC = () => {
     setSaveMessage('');
     
     try {
-      // Save all existing skills
+      // Update or create existing skills
       for (const skill of existingSkills) {
-        await userSkillsApi.createMySkill({
-          skill_name: skill.name,
-          rating: skill.rating || 'Beginner',  // Required for existing skills
-          years_experience: skill.years_experience,
-          is_interested: false,
-        });
+        if (skill.employee_skill_id) {
+          await userSkillsApi.updateMySkill(skill.employee_skill_id, {
+            rating: skill.rating || 'Beginner',
+            years_experience: skill.years_experience,
+            is_interested: false,
+          });
+        } else {
+          const created = await userSkillsApi.createMySkill({
+            skill_name: skill.name,
+            rating: skill.rating || 'Beginner',
+            years_experience: skill.years_experience,
+            is_interested: false,
+          });
+          setExistingSkills(prev => prev.map(s => s.id === skill.id ? { ...s, employee_skill_id: created.id } : s));
+        }
       }
       
-      // Save all interested skills (no rating needed)
+      // Update or create interested skills (no rating needed)
       for (const skill of interestedSkills) {
-        await userSkillsApi.createMySkill({
-          skill_name: skill.name,
-          rating: undefined,  // No rating for interested skills
-          years_experience: skill.years_experience,
-          is_interested: true,
-        });
+        if (skill.employee_skill_id) {
+          await userSkillsApi.updateMySkill(skill.employee_skill_id, {
+            rating: undefined,
+            years_experience: skill.years_experience,
+            is_interested: true,
+          });
+        } else {
+          const created = await userSkillsApi.createMySkill({
+            skill_name: skill.name,
+            years_experience: skill.years_experience,
+            is_interested: true,
+          });
+          setInterestedSkills(prev => prev.map(s => s.id === skill.id ? { ...s, employee_skill_id: created.id } : s));
+        }
       }
       
       setSaveMessage('Skills saved successfully!');
+      setAllowRemove(false);
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error('Failed to save skills:', error);
@@ -162,6 +181,30 @@ export const EmployeeDashboard: React.FC = () => {
     setInterestedSkills(
       interestedSkills.map((s) => (s.id === skillId ? { ...s, rating } : s))
     );
+  };
+
+  const handleSkillRemove = async (
+    skillId: number,
+    column: 'existing' | 'interested'
+  ) => {
+    try {
+      if (column === 'existing') {
+        const skill = existingSkills.find(s => s.id === skillId);
+        setExistingSkills(existingSkills.filter(s => s.id !== skillId));
+        if (skill?.employee_skill_id) {
+          await userSkillsApi.deleteMySkill(skill.employee_skill_id);
+        }
+      } else {
+        const skill = interestedSkills.find(s => s.id === skillId);
+        setInterestedSkills(interestedSkills.filter(s => s.id !== skillId));
+        if (skill?.employee_skill_id) {
+          await userSkillsApi.deleteMySkill(skill.employee_skill_id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to remove skill:', error);
+      loadSkills();
+    }
   };
 
   const handleSkillMove = async (
@@ -386,13 +429,13 @@ export const EmployeeDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F6F2F4]">
-      <header className="bg-[#F6F2F4] shadow-sm border-b border-gray-200">
-        <div className="w-full px-6 py-4 flex justify-between items-center">
+      <header className="bg-[#F6F2F4] shadow-sm border-b border-gray-200 -mx-4">
+        <div className="w-full px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img src={NxzenLogo} alt="Nxzen" className="h-8 w-8 object-cover" />
             <span className="text-xl font-semibold text-gray-800">nxzen</span>
             <span aria-hidden className="h-6 w-px bg-gray-300" />
-            <h1 className="text-2xl font-bold text-gray-800 italic">Skillboard - My Skills</h1>
+            <h1 className="text-2xl font-bold text-gray-800 italic" style={{ fontFamily: '"Times New Roman", Times, serif', fontStyle: 'italic' }}>Skillboard - My Skills</h1>
             <div className="ml-6 flex items-center gap-2">
               {user?.is_admin && (
                 <button
@@ -422,7 +465,7 @@ export const EmployeeDashboard: React.FC = () => {
               title="Logout"
               className="p-2 rounded-lg hover:bg-gray-200"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-red-600">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-red-600 transform rotate-180">
                 <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm3-11H9c-1.1 0-2 .9-2 2v3h2V4h10v16H9v-2H7v3c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
               </svg>
             </button>
@@ -483,6 +526,8 @@ export const EmployeeDashboard: React.FC = () => {
                 onInterestedSkillsChange={setInterestedSkills}
                 onRatingChange={handleRatingChange}
                 onSkillAdd={handleSkillAdd}
+                onSkillRemove={handleSkillRemove}
+                allowRemove={allowRemove}
               />
             </div>
           </div>

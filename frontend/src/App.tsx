@@ -14,6 +14,7 @@ import { authApi } from './services/api';
 function App() {
   return (
     <BrowserRouter>
+      <div className="min-h-screen pb-16 px-4">
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -66,6 +67,10 @@ function App() {
           })()}
         />
       </Routes>
+      </div>
+      <footer className="fixed bottom-0 left-0 right-0 bg-[#F6F2F4] border-t border-gray-200 py-3 text-center text-xs text-gray-600 z-10">
+        nxzen-skillboard@2025 All rights are reserved.
+      </footer>
     </BrowserRouter>
   );
 }

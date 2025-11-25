@@ -14,6 +14,8 @@ interface ColumnsAreaProps {
   onInterestedSkillsChange: (skills: SkillCardData[]) => void;
   onRatingChange: (skillId: number, rating: 'Beginner' | 'Developing' | 'Intermediate' | 'Advanced' | 'Expert') => void;
   onSkillAdd: (skill: SkillCardData, column: 'existing' | 'interested') => void;
+  onSkillRemove: (skillId: number, column: 'existing' | 'interested') => void;
+  allowRemove: boolean;
 }
 
 export const ColumnsArea: React.FC<ColumnsAreaProps> = ({
@@ -23,6 +25,8 @@ export const ColumnsArea: React.FC<ColumnsAreaProps> = ({
   onInterestedSkillsChange,
   onRatingChange,
   onSkillAdd,
+  onSkillRemove,
+  allowRemove,
 }) => {
   // Drag handling is now done in App component's DndContext
 
@@ -37,6 +41,8 @@ export const ColumnsArea: React.FC<ColumnsAreaProps> = ({
         skills={existingSkills}
         onRatingChange={onRatingChange}
         columnType="existing"
+        onRemove={onSkillRemove}
+        allowRemove={allowRemove}
       />
 
       {/* Interested Skills Column */}
@@ -46,6 +52,8 @@ export const ColumnsArea: React.FC<ColumnsAreaProps> = ({
         skills={interestedSkills}
         onRatingChange={onRatingChange}
         columnType="interested"
+        onRemove={onSkillRemove}
+        allowRemove={allowRemove}
       />
     </div>
   );
@@ -58,7 +66,9 @@ const SortableColumn: React.FC<{
   skills: SkillCardData[];
   onRatingChange: (skillId: number, rating: 'Beginner' | 'Developing' | 'Intermediate' | 'Advanced' | 'Expert') => void;
   columnType: 'existing' | 'interested';
-}> = ({ id, title, skills, onRatingChange, columnType }) => {
+  onRemove: (skillId: number, column: 'existing' | 'interested') => void;
+  allowRemove: boolean;
+}> = ({ id, title, skills, onRatingChange, columnType, onRemove, allowRemove }) => {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   const skillIds = skills.map((s) => s.id);
@@ -112,6 +122,8 @@ const SortableColumn: React.FC<{
                 onRatingChange={onRatingChange}
                 showRating={columnType === 'existing'}  // Only show rating for existing skills
                 columnType={columnType}
+                onRemove={() => onRemove(skill.id, columnType)}
+                showRemove={allowRemove && !skill.employee_skill_id}
               />
             ))
           )}

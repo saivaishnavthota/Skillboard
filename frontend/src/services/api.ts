@@ -219,6 +219,9 @@ export const userSkillsApi = {
     const response = await api.put<EmployeeSkill>(`/api/user-skills/${id}`, data);
     return response.data;
   },
+  deleteMySkill: async (id: number): Promise<void> => {
+    await api.delete(`/api/user-skills/me/${id}`);
+  },
 };
 
 // Search API

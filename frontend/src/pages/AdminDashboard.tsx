@@ -1,7 +1,7 @@
 /** Admin/HR Dashboard - View all employees, skills, and improvements. */
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { authApi, adminDashboardApi, adminApi, categoriesApi, bandsApi, Employee, EmployeeSkill, SkillOverview, SkillImprovement, DashboardStats, UploadResponse, BandAnalysis } from '../services/api';
 import NxzenLogo from '../images/Nxzen.jpg';
 
@@ -12,6 +12,8 @@ export const AdminDashboard: React.FC = () => {
   const [skillGapSearchQuery, setSkillGapSearchQuery] = useState<string>('');
   const [skillGapPage, setSkillGapPage] = useState<number>(1);
   const [skillGapPerPage, setSkillGapPerPage] = useState<number>(5);
+  const [adoptionSelectedSkills, setAdoptionSelectedSkills] = useState<string[]>([]);
+  const [expandedEmployees, setExpandedEmployees] = useState<string[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [skillsOverview, setSkillsOverview] = useState<SkillOverview[]>([]);
@@ -46,6 +48,7 @@ export const AdminDashboard: React.FC = () => {
   const [skillsPerPage, setSkillsPerPage] = useState<number>(10);
   const [imprPage, setImprPage] = useState<number>(1);
   const [imprPerPage, setImprPerPage] = useState<number>(10);
+  const [expandedImprovementEmployees, setExpandedImprovementEmployees] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -99,6 +102,18 @@ export const AdminDashboard: React.FC = () => {
       if (activeTab === 'overview') {
         const statsData = await adminDashboardApi.getDashboardStats();
         setStats(statsData);
+        const skillsData = await adminDashboardApi.getSkillsOverview(undefined, undefined);
+        setSkillsOverview(skillsData);
+        const initialTop5 = skillsData
+          .map(s => ({ name: s.skill.name, total: (s.existing_skills_count || 0) + (s.interested_skills_count || 0) }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10)
+          .map(s => s.name);
+        setAdoptionSelectedSkills(initialTop5);
+        try {
+          const analyses = await bandsApi.getAllEmployeesAnalysis();
+          setAllEmployeesAnalysis(analyses);
+        } catch (e) {}
       } else if (activeTab === 'employees') {
         const employeesData = await adminDashboardApi.getEmployees(0, 1000, departmentFilter || undefined);
         setEmployees(employeesData);
@@ -185,6 +200,52 @@ export const AdminDashboard: React.FC = () => {
     loadDashboardData();
   };
 
+  const handleAddAdoptionSkill = (skillName: string) => {
+    setAdoptionSelectedSkills(prev => {
+      if (!skillName || prev.includes(skillName)) return prev;
+      const next = prev.slice(0, Math.max(0, prev.length - 1));
+      next.push(skillName);
+      return next;
+    });
+  };
+
+  const AdoptionAxisTick: React.FC<any> = ({ x, y, payload }) => {
+    const label: string = payload?.value || '';
+    const maxChars = 12;
+    const words = label.split(' ');
+    const lines: string[] = [];
+    let current = '';
+    for (const w of words) {
+      const test = current ? current + ' ' + w : w;
+      if (test.length > maxChars) {
+        if (current) lines.push(current);
+        current = w;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    const dyStart = 12;
+    const dyStep = 12;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fill="#374151" fontSize={12}>
+          {lines.slice(0, 3).map((line, i) => (
+            <tspan key={i} x={0} dy={i === 0 ? dyStart : dyStep}>{line}</tspan>
+          ))}
+        </text>
+      </g>
+    );
+  };
+
+  const toggleEmployeeExpanded = (employeeId: string) => {
+    setExpandedEmployees(prev => (
+      prev.includes(employeeId)
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    ));
+  };
+
   const addCriterion = () => {
     setSearchCriteria([...searchCriteria, { skill_name: '', rating: '' }]);
   };
@@ -255,13 +316,13 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F6F2F4]">
-      <header className="bg-[#F6F2F4] shadow-sm border-b border-gray-200">
-        <div className="w-full px-6 py-4 flex justify-between items-center">
+      <header className="bg-[#F6F2F4] shadow-sm border-b border-gray-200 -mx-4">
+        <div className="w-full px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img src={NxzenLogo} alt="Nxzen" className="h-8 w-8 object-cover" />
             <span className="text-xl font-semibold text-gray-800">nxzen</span>
             <span aria-hidden className="h-6 w-px bg-gray-300" />
-            <h1 className="text-2xl font-bold text-gray-800 italic">HR/Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-gray-800 italic" style={{ fontFamily: '"Times New Roman", Times, serif', fontStyle: 'italic' }}>HR/Admin Dashboard</h1>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-200">
@@ -281,7 +342,7 @@ export const AdminDashboard: React.FC = () => {
               title="Logout"
               className="p-2 rounded-lg hover:bg-gray-200"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-red-600">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-red-600 transform rotate-180">
                 <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm3-11H9c-1.1 0-2 .9-2 2v3h2V4h10v16H9v-2H7v3c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
               </svg>
             </button>
@@ -460,6 +521,145 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'overview' && stats && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {(() => {
+              const ratingOrder = ['Beginner','Developing','Intermediate','Advanced','Expert'];
+              const ratingColors: Record<string, string> = {
+                Beginner: '#22c55e',
+                Developing: '#3b82f6',
+                Intermediate: '#eab308',
+                Advanced: '#fb923c',
+                Expert: '#a78bfa',
+              };
+              const ratingData = ratingOrder.map(r => ({ rating: r, count: stats.rating_breakdown[r] || 0, color: ratingColors[r] }));
+              const existing = stats.employees_with_existing_skills;
+              const existingPie = [
+                { name: 'Has Existing Skills', value: existing },
+                { name: 'No Existing Skills', value: Math.max(0, stats.total_employees - existing) },
+              ];
+              const interested = stats.employees_with_interested_skills;
+              const interestedPie = [
+                { name: 'Has Interested Skills', value: interested },
+                { name: 'No Interested Skills', value: Math.max(0, stats.total_employees - interested) },
+              ];
+              const adoptionData = (adoptionSelectedSkills || []).map(name => {
+                const s = (skillsOverview || []).find(x => x.skill.name === name);
+                return {
+                  name,
+                  existing: s ? (s.existing_skills_count || 0) : 0,
+                  interested: s ? (s.interested_skills_count || 0) : 0,
+                };
+              });
+              const availableOptions = (skillsOverview || [])
+                .map(s => s.skill.name)
+                .filter(n => !(adoptionSelectedSkills || []).includes(n));
+              const bandRatingsMap: Record<string, { Beginner: number; Developing: number; Intermediate: number; Advanced: number; Expert: number; }> = {};
+              (allEmployeesAnalysis || []).forEach(a => {
+                const v = Math.round(a.average_rating);
+                const t = v <= 1 ? 'Beginner' : v === 2 ? 'Developing' : v === 3 ? 'Intermediate' : v === 4 ? 'Advanced' : 'Expert';
+                if (!bandRatingsMap[a.band]) bandRatingsMap[a.band] = { Beginner: 0, Developing: 0, Intermediate: 0, Advanced: 0, Expert: 0 };
+                bandRatingsMap[a.band][t] += 1;
+              });
+              const bandRatingsData = Object.keys(bandRatingsMap).sort().map(b => ({ band: b, ...bandRatingsMap[b] }));
+              return (
+                <>
+                  
+
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Ratings Trend</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={ratingData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="rating" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="count" name="Count" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Band vs Ratings (stacked)</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={bandRatingsData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="band" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="Beginner" stackId="a" fill={ratingColors.Beginner} />
+                          <Bar dataKey="Developing" stackId="a" fill={ratingColors.Developing} />
+                          <Bar dataKey="Intermediate" stackId="a" fill={ratingColors.Intermediate} />
+                          <Bar dataKey="Advanced" stackId="a" fill={ratingColors.Advanced} />
+                          <Bar dataKey="Expert" stackId="a" fill={ratingColors.Expert} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Employees Skill Adoption</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={existingPie} cx="50%" cy="50%" outerRadius={60} label dataKey="value">
+                            {existingPie.map((entry, index) => (
+                              <Cell key={`cell-ex-${index}`} fill={index === 0 ? '#10b981' : '#f59e0b'} />
+                            ))}
+                          </Pie>
+                          <Pie data={interestedPie} cx="50%" cy="50%" innerRadius={70} outerRadius={100} dataKey="value">
+                            {interestedPie.map((entry, index) => (
+                              <Cell key={`cell-in-${index}`} fill={index === 0 ? '#6366f1' : '#ef4444'} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="lg:col-span-3">
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold text-gray-800">Top 10 Skills by Adoption</h3>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600">Add skill</label>
+                          <select
+                            onChange={(e) => { const v = e.target.value; if (v) { handleAddAdoptionSkill(v); } e.currentTarget.selectedIndex = 0; }}
+                            className="px-2 py-1 border border-gray-300 rounded bg-white text-xs"
+                          >
+                            <option value="">Select skill</option>
+                            {availableOptions.slice(0, 50).map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={adoptionData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" interval={0} tick={<AdoptionAxisTick />} height={60} tickMargin={8} />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="existing" name="Existing" fill="#10b981" />
+                            <Bar dataKey="interested" name="Interested" fill="#6366f1" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -1100,7 +1300,11 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="space-y-6">
                     {paginatedAnalysis.map((analysis) => (
-                  <div key={analysis.employee_id} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+                  <div
+                    key={analysis.employee_id}
+                    className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden cursor-pointer"
+                    onClick={() => toggleEmployeeExpanded(analysis.employee_id)}
+                  >
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
                       <div className="flex justify-between items-center">
                         <div>
@@ -1120,6 +1324,12 @@ export const AdminDashboard: React.FC = () => {
                             <div className="text-xs text-gray-500 mb-1">Total Skills</div>
                             <div className="text-lg font-semibold text-gray-900">{analysis.total_skills}</div>
                           </div>
+                          <span className="flex items-center p-2  border-gray-300 text-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`w-4 h-4 transition-transform ${expandedEmployees.includes(analysis.employee_id) ? 'rotate-180' : ''}`}
+                            >
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                          </span>
                         </div>
                       </div>
                       <div className="mt-4 flex gap-4">
@@ -1143,91 +1353,93 @@ export const AdminDashboard: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    {analysis.skill_gaps.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Skill</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Current Rating</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Required Rating</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Gap</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {analysis.skill_gaps.map((gap, idx) => {
-                              const getGapColor = (gap: number) => {
-                                if (gap > 0) return 'bg-green-100 text-green-800';
-                                if (gap === 0) return 'bg-gray-100 text-gray-800';
-                                return 'bg-yellow-100 text-yellow-800';
-                              };
-                              const getRatingColor = (rating?: string) => {
-                                switch (rating) {
-                                  case 'Expert': return 'bg-purple-100 text-purple-800';
-                                  case 'Advanced': return 'bg-orange-100 text-orange-800';
-                                  case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
-                                  case 'Developing': return 'bg-blue-100 text-blue-800';
-                                  case 'Beginner': return 'bg-green-100 text-green-800';
-                                  default: return 'bg-gray-100 text-gray-600';
-                                }
-                              };
-                              return (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {gap.skill_name}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                    {gap.skill_category || 'N/A'}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    {gap.current_rating_text ? (
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRatingColor(gap.current_rating_text)}`}>
-                                        {gap.current_rating_text} ({gap.current_rating_number || 'N/A'})
+                    {expandedEmployees.includes(analysis.employee_id) && (
+                      analysis.skill_gaps.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Skill</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Current Rating</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Required Rating</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Gap</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {analysis.skill_gaps.map((gap, idx) => {
+                                const getGapColor = (gap: number) => {
+                                  if (gap > 0) return 'bg-green-100 text-green-800';
+                                  if (gap === 0) return 'bg-gray-100 text-gray-800';
+                                  return 'bg-yellow-100 text-yellow-800';
+                                };
+                                const getRatingColor = (rating?: string) => {
+                                  switch (rating) {
+                                    case 'Expert': return 'bg-purple-100 text-purple-800';
+                                    case 'Advanced': return 'bg-orange-100 text-orange-800';
+                                    case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
+                                    case 'Developing': return 'bg-blue-100 text-blue-800';
+                                    case 'Beginner': return 'bg-green-100 text-green-800';
+                                    default: return 'bg-gray-100 text-gray-600';
+                                  }
+                                };
+                                return (
+                                  <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      {gap.skill_name}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                      {gap.skill_category || 'N/A'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      {gap.current_rating_text ? (
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRatingColor(gap.current_rating_text)}`}>
+                                          {gap.current_rating_text} ({gap.current_rating_number || 'N/A'})
+                                        </span>
+                                      ) : (
+                                        <span className="text-sm text-gray-400">No rating</span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRatingColor(gap.required_rating_text)}`}>
+                                        {gap.required_rating_text} ({gap.required_rating_number})
                                       </span>
-                                    ) : (
-                                      <span className="text-sm text-gray-400">No rating</span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRatingColor(gap.required_rating_text)}`}>
-                                      {gap.required_rating_text} ({gap.required_rating_number})
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getGapColor(gap.gap)}`}>
-                                      {gap.gap > 0 ? '+' : ''}{gap.gap}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    {gap.gap > 0 ? (
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Above Requirement
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getGapColor(gap.gap)}`}>
+                                        {gap.gap > 0 ? '+' : ''}{gap.gap}
                                       </span>
-                                    ) : gap.gap === 0 ? (
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        At Requirement
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                        Below Requirement
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="px-6 py-8 text-center text-sm text-gray-500">
-                        No skill gaps found for this employee.
-                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      {gap.gap > 0 ? (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          Above Requirement
+                                        </span>
+                                      ) : gap.gap === 0 ? (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                          At Requirement
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                          Below Requirement
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="px-6 py-8 text-center text-sm text-gray-500">
+                          No skill gaps found for this employee.
+                        </div>
+                      )
                     )}
                   </div>
-                    ))}
+                  ))}
                   </div>
                   
                   {/* Pagination Controls */}
@@ -1310,45 +1522,107 @@ export const AdminDashboard: React.FC = () => {
                   Showing only skills where employees have improved (current rating &gt; initial rating). Skills are tracked from their first rating.
                 </p>
               </div>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Skill</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Initial Rating</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Rating</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Years Experience</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {improvements.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
-                          No skill improvements found. Employees need to upgrade their skill ratings to appear here.
-                        </td>
-                      </tr>
-                    ) : (
-                      improvements.slice((imprPage-1)*imprPerPage, (imprPage-1)*imprPerPage + imprPerPage).map((imp, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {imp.employee_name} ({imp.employee_id})
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{imp.skill_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{imp.initial_rating}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              {imp.current_rating}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{imp.years_experience || '-'}</td>
+                {(() => {
+                  const grouped: Array<{ employee_id: string; employee_name: string; items: SkillImprovement[] }> = [];
+                  const byId: Record<string, number> = {};
+                  improvements.forEach((imp) => {
+                    const key = imp.employee_id;
+                    if (byId[key] === undefined) {
+                      byId[key] = grouped.length;
+                      grouped.push({ employee_id: imp.employee_id, employee_name: imp.employee_name, items: [imp] });
+                    } else {
+                      grouped[byId[key]].items.push(imp);
+                    }
+                  });
+
+                  if (grouped.length === 0) {
+                    return (
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <tbody>
+                          <tr>
+                            <td className="px-6 py-8 text-center text-sm text-gray-500">No skill improvements found. Employees need to upgrade their skill ratings to appear here.</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    );
+                  }
+
+                  const start = (imprPage - 1) * imprPerPage;
+                  const end = start + imprPerPage;
+                  const pageItems = grouped.slice(start, end);
+
+                  return (
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Improvements</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Show More</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {pageItems.map((grp, idx) => (
+                          <>
+                            <tr key={`${grp.employee_id}-row`} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {grp.employee_name} ({grp.employee_id})
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {grp.items.length}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <button
+                                  onClick={() => setExpandedImprovementEmployees(prev => prev.includes(grp.employee_id) ? prev.filter(id => id !== grp.employee_id) : [...prev, grp.employee_id])}
+                                  className="px-3 py-1 rounded-md border border-gray-300 text-xs bg-white hover:bg-gray-50"
+                                >
+                                  {expandedImprovementEmployees.includes(grp.employee_id) ? 'Hide' : 'Show More'}
+                                </button>
+                              </td>
+                            </tr>
+                            {expandedImprovementEmployees.includes(grp.employee_id) && (
+                              <tr key={`${grp.employee_id}-details`}>
+                                <td colSpan={3} className="px-6 py-4">
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Skill</th>
+                                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Initial Rating</th>
+                                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Rating</th>
+                                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Years Experience</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="bg-white divide-y divide-gray-200">
+                                        {grp.items.map((impItem, i) => (
+                                          <tr key={`${grp.employee_id}-${i}`} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{impItem.skill_name}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{impItem.initial_rating}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{impItem.current_rating}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{impItem.years_experience || '-'}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
                 <div className="flex justify-end items-center gap-2 p-3">
                   {(() => {
-                    const total = improvements.length;
+                    const groupedCount = (() => {
+                      const ids: Record<string, boolean> = {};
+                      improvements.forEach(i => { ids[i.employee_id] = true; });
+                      return Object.keys(ids).length;
+                    })();
+                    const total = groupedCount;
                     const totalPages = Math.max(1, Math.ceil(total / imprPerPage));
                     return (
                       <>
