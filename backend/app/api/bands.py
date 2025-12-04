@@ -181,42 +181,39 @@ def get_employee_band_analysis(
     employee_name: str
 ) -> BandAnalysis:
     """Calculate band analysis for an employee."""
+    # Get employee to get their predefined band from database
+    employee = db.query(Employee).filter(Employee.id == employee_db_id).first()
+    
     # Get all employee skills (existing skills only, with ratings)
+    # EXCLUDE custom skills (is_custom=True) - they are not required for the role
     employee_skills = (
         db.query(EmployeeSkill, Skill)
         .join(Skill, EmployeeSkill.skill_id == Skill.id)
         .filter(
             EmployeeSkill.employee_id == employee_db_id,
             EmployeeSkill.is_interested == False,
+            EmployeeSkill.is_custom == False,  # Exclude custom skills from gap analysis
             EmployeeSkill.rating.isnot(None)
         )
         .all()
     )
+    
+    # Use band from database (predefined), default to "A" if not set
+    band = employee.band if employee and employee.band else "A"
     
     if not employee_skills:
         # No skills - return default analysis
         return BandAnalysis(
             employee_id=employee_id,
             employee_name=employee_name,
-            band="A",
-            average_rating=1.0,
+            band=band,
+            average_rating=0.0,
             total_skills=0,
             skills_above_requirement=0,
             skills_at_requirement=0,
             skills_below_requirement=0,
             skill_gaps=[],
         )
-    
-    # Calculate average rating and band
-    total_rating = 0
-    count = 0
-    for emp_skill, skill in employee_skills:
-        if emp_skill.rating:
-            total_rating += RATING_TO_NUMBER[emp_skill.rating]
-            count += 1
-    
-    average_rating = total_rating / count if count > 0 else 1.0
-    band = calculate_band(average_rating)
     
     # Get role requirements for this band
     role_requirements = (
@@ -287,7 +284,7 @@ def get_employee_band_analysis(
         employee_id=employee_id,
         employee_name=employee_name,
         band=band,
-        average_rating=round(average_rating, 2),
+        average_rating=0.0,  # No longer calculated - band comes from database
         total_skills=len(employee_skills),
         skills_above_requirement=skills_above,
         skills_at_requirement=skills_at,

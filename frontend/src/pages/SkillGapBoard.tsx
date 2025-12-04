@@ -212,7 +212,7 @@ export const SkillGapBoard: React.FC = () => {
         </div>
         {/* Summary Card */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="flex flex-col">
               <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Employee</div>
               <div className="text-lg font-bold text-gray-900">{analysis.employee_name}</div>
@@ -220,10 +220,6 @@ export const SkillGapBoard: React.FC = () => {
             <div className="flex flex-col">
               <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Band</div>
               <div className="text-lg font-bold text-blue-600">{analysis.band}</div>
-            </div>
-            <div className="flex flex-col">
-              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Average Rating</div>
-              <div className="text-lg font-bold text-gray-900">{analysis.average_rating.toFixed(2)}</div>
             </div>
             <div className="flex flex-col">
               <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Skills</div>

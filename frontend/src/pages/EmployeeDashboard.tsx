@@ -374,36 +374,52 @@ export const EmployeeDashboard: React.FC = () => {
                 ) : !analysis ? (
                   <div className="h-48 flex items-center justify-center text-gray-500">No skills data</div>
                 ) : (
-                  <div className="flex items-center gap-4">
-                    {/* Pie Chart for Below/At/Above Requirements */}
-                    <div className="relative w-40 h-40 flex-shrink-0">
-                      <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                  <div className="flex items-center gap-6">
+                    {/* Clean Pie Chart - segments in order: Green (Above) → Gray (At) → Yellow (Below) */}
+                    <div className="relative w-36 h-36 flex-shrink-0">
+                      <svg viewBox="0 0 36 36" className="w-full h-full">
                         {(() => {
-                          const data = [
-                            { name: 'Below Requirement', value: analysis.skills_below_requirement, color: '#EAB308' },
-                            { name: 'At Requirement', value: analysis.skills_at_requirement, color: '#6B7280' },
-                            { name: 'Above Requirement', value: analysis.skills_above_requirement, color: '#22C55E' },
-                          ].filter(d => d.value > 0);
-                          const total = data.reduce((sum, d) => sum + d.value, 0);
-                          if (total === 0) return null;
-                          let cumulative = 0;
-                          return data.map((item) => {
-                            const percentage = (item.value / total) * 100;
-                            const dashArray = `${percentage} ${100 - percentage}`;
-                            const dashOffset = -cumulative;
-                            cumulative += percentage;
-                            return (
-                              <circle
-                                key={item.name}
-                                cx="50" cy="50" r="40"
-                                fill="transparent"
-                                stroke={item.color}
-                                strokeWidth="20"
-                                strokeDasharray={dashArray}
-                                strokeDashoffset={dashOffset}
-                              />
+                          const above = analysis.skills_above_requirement;
+                          const at = analysis.skills_at_requirement;
+                          const below = analysis.skills_below_requirement;
+                          const total = above + at + below;
+                          if (total === 0) return <circle cx="18" cy="18" r="15.9" fill="transparent" stroke="#E5E7EB" strokeWidth="3" />;
+                          
+                          const abovePct = (above / total) * 100;
+                          const atPct = (at / total) * 100;
+                          const belowPct = (below / total) * 100;
+                          
+                          // Calculate stroke-dasharray for each segment (circumference = 100)
+                          const segments = [];
+                          let offset = 25; // Start at top (25 = 90 degrees offset for top start)
+                          
+                          if (above > 0) {
+                            segments.push(
+                              <circle key="above" cx="18" cy="18" r="15.9" fill="transparent"
+                                stroke="#22C55E" strokeWidth="3.5"
+                                strokeDasharray={`${abovePct} ${100 - abovePct}`}
+                                strokeDashoffset={offset} strokeLinecap="round" />
                             );
-                          });
+                            offset -= abovePct;
+                          }
+                          if (at > 0) {
+                            segments.push(
+                              <circle key="at" cx="18" cy="18" r="15.9" fill="transparent"
+                                stroke="#6B7280" strokeWidth="3.5"
+                                strokeDasharray={`${atPct} ${100 - atPct}`}
+                                strokeDashoffset={offset} strokeLinecap="round" />
+                            );
+                            offset -= atPct;
+                          }
+                          if (below > 0) {
+                            segments.push(
+                              <circle key="below" cx="18" cy="18" r="15.9" fill="transparent"
+                                stroke="#F59E0B" strokeWidth="3.5"
+                                strokeDasharray={`${belowPct} ${100 - belowPct}`}
+                                strokeDashoffset={offset} strokeLinecap="round" />
+                            );
+                          }
+                          return segments;
                         })()}
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -413,22 +429,31 @@ export const EmployeeDashboard: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    {/* Legend */}
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0 bg-yellow-500" />
-                        <span className="text-gray-700">Below Requirement</span>
-                        <span className="text-gray-500 ml-auto font-semibold">({analysis.skills_below_requirement})</span>
+                    {/* Legend - Clean vertical layout */}
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full bg-green-500 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">Above Requirement</div>
+                          <div className="text-xs text-gray-500">Exceeding expectations</div>
+                        </div>
+                        <div className="text-lg font-bold text-green-600">{analysis.skills_above_requirement}</div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0 bg-gray-500" />
-                        <span className="text-gray-700">At Requirement</span>
-                        <span className="text-gray-500 ml-auto font-semibold">({analysis.skills_at_requirement})</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full bg-gray-500 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">At Requirement</div>
+                          <div className="text-xs text-gray-500">Meeting expectations</div>
+                        </div>
+                        <div className="text-lg font-bold text-gray-600">{analysis.skills_at_requirement}</div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0 bg-green-500" />
-                        <span className="text-gray-700">Above Requirement</span>
-                        <span className="text-gray-500 ml-auto font-semibold">({analysis.skills_above_requirement})</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full bg-amber-500 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">Below Requirement</div>
+                          <div className="text-xs text-gray-500">Needs improvement</div>
+                        </div>
+                        <div className="text-lg font-bold text-amber-600">{analysis.skills_below_requirement}</div>
                       </div>
                     </div>
                   </div>
@@ -620,10 +645,7 @@ export const EmployeeDashboard: React.FC = () => {
                 <div className="text-xs text-gray-500 uppercase mb-1">Band</div>
                 <div className="text-xl font-bold text-blue-600">{analysis?.band || 'L1'}</div>
               </div>
-              <div className="bg-white rounded-md shadow-sm p-3">
-                <div className="text-xs text-gray-500 uppercase mb-1">Average Rating</div>
-                <div className="text-xl font-bold text-gray-900">{analysis?.average_rating.toFixed(2) || '0.00'}</div>
-              </div>
+              
               <div className="bg-white rounded-md shadow-sm p-3">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Skills</div>
                 <div className="text-xl font-bold text-gray-900">{analysis?.total_skills || 0}</div>
@@ -636,8 +658,17 @@ export const EmployeeDashboard: React.FC = () => {
 
             {/* Full Skill Gap Analysis Table */}
             <div className="bg-white rounded-md shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200">
+              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-900">Skill Gap Analysis</h3>
+                <button
+                  onClick={() => navigate('/skill-browser')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                  </svg>
+                  Edit Skills
+                </button>
               </div>
 
               {/* Filter Buttons */}

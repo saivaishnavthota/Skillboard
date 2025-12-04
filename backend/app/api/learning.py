@@ -466,9 +466,17 @@ def auto_assign_courses_by_skill_gap(
         explicit_skill_ids = {req.skill_id for req in role_requirements}
         
         # Get all employee skills to check against default band requirements
+        # EXCLUDE custom skills (is_custom=True) - they are not required for the role
         employee_skills = db.query(EmployeeSkill).filter(
             EmployeeSkill.employee_id == employee.id,
-            EmployeeSkill.is_interested == False
+            EmployeeSkill.is_interested == False,
+            EmployeeSkill.is_custom == False  # Exclude custom skills from gap analysis
+        ).all()
+        
+        # Get interested skills for auto-assignment (user wants to learn these)
+        interested_skills = db.query(EmployeeSkill).filter(
+            EmployeeSkill.employee_id == employee.id,
+            EmployeeSkill.is_interested == True
         ).all()
         
         # Get default required rating for this band
@@ -481,6 +489,10 @@ def auto_assign_courses_by_skill_gap(
                 EmployeeSkill.employee_id == employee.id,
                 EmployeeSkill.skill_id == requirement.skill_id
             ).first()
+            
+            # Skip if this is a custom skill (not required for role)
+            if employee_skill and employee_skill.is_custom:
+                continue
             
             # Determine if employee is below required level
             current_level = rating_to_level(employee_skill.rating if employee_skill else None)
@@ -568,11 +580,49 @@ def auto_assign_courses_by_skill_gap(
                         })
                     else:
                         skipped_count += 1
+        
+        # Auto-assign courses for INTERESTED skills (user wants to learn these)
+        for interested_skill in interested_skills:
+            # Find all courses mapped to this skill
+            courses = db.query(Course).filter(
+                Course.skill_id == interested_skill.skill_id
+            ).all()
+            
+            for course in courses:
+                # Check if already assigned
+                existing = db.query(CourseAssignment).filter(
+                    CourseAssignment.employee_id == employee.id,
+                    CourseAssignment.course_id == course.id
+                ).first()
+                
+                if not existing:
+                    # Create assignment
+                    db_assignment = CourseAssignment(
+                        course_id=course.id,
+                        employee_id=employee.id,
+                        assigned_by=current_user.id,
+                        status=CourseStatusEnum.NOT_STARTED,
+                    )
+                    db.add(db_assignment)
+                    assigned_count += 1
+                    
+                    skill = db.query(Skill).filter(Skill.id == interested_skill.skill_id).first()
+                    assignment_details.append({
+                        "employee_id": employee.employee_id,
+                        "employee_name": employee.name,
+                        "course_title": course.title,
+                        "skill_name": skill.name if skill else "Unknown",
+                        "current_level": "Interested",
+                        "required_level": "Learning Goal",
+                        "reason": "interested_skill",
+                    })
+                else:
+                    skipped_count += 1
     
     db.commit()
     
     return {
-        "message": f"Auto-assigned {assigned_count} courses based on skill gaps",
+        "message": f"Auto-assigned {assigned_count} courses based on skill gaps and interests",
         "assigned": assigned_count,
         "skipped": skipped_count,
         "details": assignment_details,
@@ -609,9 +659,17 @@ def auto_assign_courses_for_employee(
     explicit_skill_ids = {req.skill_id for req in role_requirements}
     
     # Get all employee skills to check against default band requirements
+    # EXCLUDE custom skills (is_custom=True) - they are not required for the role
     employee_skills = db.query(EmployeeSkill).filter(
         EmployeeSkill.employee_id == employee.id,
-        EmployeeSkill.is_interested == False
+        EmployeeSkill.is_interested == False,
+        EmployeeSkill.is_custom == False  # Exclude custom skills from gap analysis
+    ).all()
+    
+    # Get interested skills for auto-assignment (user wants to learn these)
+    interested_skills = db.query(EmployeeSkill).filter(
+        EmployeeSkill.employee_id == employee.id,
+        EmployeeSkill.is_interested == True
     ).all()
     
     # Get default required rating for this band
@@ -624,6 +682,10 @@ def auto_assign_courses_for_employee(
             EmployeeSkill.employee_id == employee.id,
             EmployeeSkill.skill_id == requirement.skill_id
         ).first()
+        
+        # Skip if this is a custom skill (not required for role)
+        if employee_skill and employee_skill.is_custom:
+            continue
         
         # Determine if employee is below required level
         current_level = rating_to_level(employee_skill.rating if employee_skill else None)
@@ -707,6 +769,42 @@ def auto_assign_courses_for_employee(
                 else:
                     skipped_count += 1
     
+    # Auto-assign courses for INTERESTED skills (user wants to learn these)
+    for interested_skill in interested_skills:
+        # Find all courses mapped to this skill
+        courses = db.query(Course).filter(
+            Course.skill_id == interested_skill.skill_id
+        ).all()
+        
+        for course in courses:
+            # Check if already assigned
+            existing = db.query(CourseAssignment).filter(
+                CourseAssignment.employee_id == employee.id,
+                CourseAssignment.course_id == course.id
+            ).first()
+            
+            if not existing:
+                # Create assignment
+                db_assignment = CourseAssignment(
+                    course_id=course.id,
+                    employee_id=employee.id,
+                    assigned_by=current_user.id,
+                    status=CourseStatusEnum.NOT_STARTED,
+                )
+                db.add(db_assignment)
+                assigned_count += 1
+                
+                skill = db.query(Skill).filter(Skill.id == interested_skill.skill_id).first()
+                assignment_details.append({
+                    "course_title": course.title,
+                    "skill_name": skill.name if skill else "Unknown",
+                    "current_level": "Interested",
+                    "required_level": "Learning Goal",
+                    "reason": "interested_skill",
+                })
+            else:
+                skipped_count += 1
+    
     db.commit()
     
     return {
@@ -745,10 +843,11 @@ def get_skill_gap_report(
         # Create a set of skill IDs that have explicit requirements
         explicit_skill_ids = {req.skill_id for req in role_requirements}
         
-        # Get all employee skills
+        # Get all employee skills - EXCLUDE custom skills from gap analysis
         employee_skills = db.query(EmployeeSkill).filter(
             EmployeeSkill.employee_id == employee.id,
-            EmployeeSkill.is_interested == False
+            EmployeeSkill.is_interested == False,
+            EmployeeSkill.is_custom == False  # Exclude custom skills from gap analysis
         ).all()
         
         # Get default required rating for this band
@@ -761,6 +860,10 @@ def get_skill_gap_report(
                 EmployeeSkill.employee_id == employee.id,
                 EmployeeSkill.skill_id == requirement.skill_id
             ).first()
+            
+            # Skip if this is a custom skill (not required for role)
+            if employee_skill and employee_skill.is_custom:
+                continue
             
             # Determine if employee is below required level
             current_level = rating_to_level(employee_skill.rating if employee_skill else None)
@@ -854,12 +957,56 @@ def get_skill_gap_report(
                     "available_courses": available_courses,
                 })
         
-        if employee_gaps:
+        # Get interested skills for this employee
+        interested_skills_list = []
+        interested_skills = db.query(EmployeeSkill).filter(
+            EmployeeSkill.employee_id == employee.id,
+            EmployeeSkill.is_interested == True
+        ).all()
+        
+        for interested_skill in interested_skills:
+            skill = db.query(Skill).filter(Skill.id == interested_skill.skill_id).first()
+            
+            # Find courses for this interested skill
+            courses = db.query(Course).filter(
+                Course.skill_id == interested_skill.skill_id
+            ).all()
+            
+            assigned_courses = []
+            available_courses = []
+            
+            for course in courses:
+                assignment = db.query(CourseAssignment).filter(
+                    CourseAssignment.employee_id == employee.id,
+                    CourseAssignment.course_id == course.id
+                ).first()
+                
+                if assignment:
+                    assigned_courses.append({
+                        "course_id": course.id,
+                        "course_title": course.title,
+                        "status": assignment.status.value,
+                    })
+                else:
+                    available_courses.append({
+                        "course_id": course.id,
+                        "course_title": course.title,
+                    })
+            
+            interested_skills_list.append({
+                "skill_id": interested_skill.skill_id,
+                "skill_name": skill.name if skill else "Unknown",
+                "assigned_courses": assigned_courses,
+                "available_courses": available_courses,
+            })
+        
+        if employee_gaps or interested_skills_list:
             report.append({
                 "employee_id": employee.id,
                 "employee_name": employee.name,
                 "band": employee.band,
                 "skill_gaps": employee_gaps,
+                "interested_skills": interested_skills_list,
             })
     
     return report
