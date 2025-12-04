@@ -12,6 +12,7 @@ export interface SkillCardData {
   description?: string;
   rating?: 'Beginner' | 'Developing' | 'Intermediate' | 'Advanced' | 'Expert';
   years_experience?: number;
+  is_custom?: boolean;
 }
 
 interface SkillCardProps {

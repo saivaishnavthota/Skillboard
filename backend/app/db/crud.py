@@ -159,6 +159,7 @@ def upsert_employee_skill(
     notes: Optional[str] = None,
     match_score: Optional[float] = None,
     needs_review: bool = False,
+    is_custom: bool = False,
 ) -> EmployeeSkill:
     """Create or update an employee-skill mapping."""
     db_employee_skill = get_employee_skill(db, employee_id, skill_id)
@@ -183,6 +184,7 @@ def upsert_employee_skill(
         if match_score is not None:
             db_employee_skill.match_score = match_score
         db_employee_skill.needs_review = needs_review
+        db_employee_skill.is_custom = is_custom
         db.commit()
         db.refresh(db_employee_skill)
         return db_employee_skill
@@ -204,6 +206,7 @@ def upsert_employee_skill(
                 "notes": notes,
                 "match_score": match_score,
                 "needs_review": needs_review,
+                "is_custom": is_custom,
             },
         )
 

@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db import database
-from app.api import skills, userskills, search, admin, auth, admin_users, admin_employee_skills, admin_dashboard, teams, bands, categories, admin_category_templates
+from app.api import skills, userskills, search, admin, auth, admin_users, admin_employee_skills, admin_dashboard, teams, bands, categories, admin_category_templates, learning, role_requirements
 
 app = FastAPI(
     title="Skillboard API",
@@ -32,6 +32,8 @@ app.include_router(teams.router)
 app.include_router(bands.router)
 app.include_router(categories.router)
 app.include_router(admin_category_templates.router)
+app.include_router(learning.router)
+app.include_router(role_requirements.router)
 
 
 @app.on_event("startup")

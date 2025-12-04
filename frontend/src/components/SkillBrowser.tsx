@@ -97,53 +97,48 @@ export const SkillBrowser: React.FC<SkillBrowserProps> = ({ searchQuery, exclude
   const categories = Object.keys(skillsByCategory).sort();
 
   return (
-    <div className="h-full max-h-[70vh] overflow-y-auto no-scrollbar">
-      <div className="p-4">
-        <h2 className="text-lg font-semibold mb-4 text-gray-700">
-          Master Skills ({filteredSkills.length})
-        </h2>
-        {filteredSkills.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            {searchQuery ? 'No skills match your search' : 'No skills available'}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {categories.map((category) => {
-              const categorySkills = skillsByCategory[category];
-              const isExpanded = expandedCategories.has(category);
-              
-              return (
-                <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => toggleCategory(category)}
-                    className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
+    <div className="h-full max-h-[calc(100vh-180px)] overflow-y-auto">
+      {filteredSkills.length === 0 ? (
+        <div className="text-center text-gray-500 py-4 text-xs">
+          {searchQuery ? 'No skills match your search' : 'No skills available'}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {categories.map((category) => {
+            const categorySkills = skillsByCategory[category];
+            const isExpanded = expandedCategories.has(category);
+            
+            return (
+              <div key={category} className="border border-gray-200 rounded overflow-hidden">
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="w-full px-2 py-1.5 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-gray-700">{category}</span>
+                    <span className="text-xs text-gray-500">({categorySkills.length})</span>
+                  </div>
+                  <svg
+                    className={`w-3 h-3 text-gray-500 transition-transform ${isExpanded ? 'transform rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-700">{category}</span>
-                      <span className="text-xs text-gray-500">({categorySkills.length})</span>
-                    </div>
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'transform rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {isExpanded && (
-                    <div className="p-2 space-y-2 bg-white">
-                      {categorySkills.map((skill) => (
-                        <DraggableSkillCard key={skill.id} skill={skill} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {isExpanded && (
+                  <div className="p-1 space-y-1 bg-white">
+                    {categorySkills.map((skill) => (
+                      <DraggableSkillCard key={skill.id} skill={skill} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -178,9 +173,9 @@ const DraggableSkillCard: React.FC<{ skill: Skill }> = ({ skill }) => {
       {...listeners}
       {...attributes}
       className={`
-        bg-white rounded-lg shadow-sm p-3 mb-2 cursor-grab active:cursor-grabbing
+        bg-white rounded shadow-sm p-1.5 cursor-grab active:cursor-grabbing
         border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all
-        ${isDragging ? 'shadow-lg z-50' : ''}
+        ${isDragging ? 'shadow-lg ring-2 ring-blue-400 opacity-50' : ''}
       `}
       role="button"
       tabIndex={0}
@@ -191,10 +186,17 @@ const DraggableSkillCard: React.FC<{ skill: Skill }> = ({ skill }) => {
         }
       }}
     >
-      <h3 className="font-medium text-gray-800">{skill.name}</h3>
-      {skill.description && (
-        <p className="text-sm text-gray-600 mt-1">{skill.description}</p>
-      )}
+      <div className="flex items-start gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3 text-gray-400 flex-shrink-0 mt-0.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-gray-800 text-xs">{skill.name}</h3>
+          {skill.description && (
+            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{skill.description}</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

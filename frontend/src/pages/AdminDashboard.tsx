@@ -37,7 +37,14 @@ export const AdminDashboard: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searching, setSearching] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
+  const [categoryTemplates, setCategoryTemplates] = useState<Record<string, any[]>>({});
+  const categoryFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const [expandedSubcategories, setExpandedSubcategories] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   const user = authApi.getUser();
@@ -118,11 +125,22 @@ export const AdminDashboard: React.FC = () => {
         const employeesData = await adminDashboardApi.getEmployees(0, 1000, departmentFilter || undefined);
         setEmployees(employeesData);
       } else if (activeTab === 'skills') {
-        const skillsData = await adminDashboardApi.getSkillsOverview(
-          categoryFilter || undefined,
-          skillCategoryFilter || undefined
-        );
-        setSkillsOverview(skillsData);
+        // Load category templates
+        const categories = await categoriesApi.getAll();
+        setEmployeeCategories(categories);
+        
+        // Load templates with stats for each category
+        const templates: Record<string, any[]> = {};
+        for (const category of categories) {
+          try {
+            const template = await categoriesApi.getTemplateWithStats(category);
+            templates[category] = template;
+          } catch (error) {
+            console.error(`Failed to load template for ${category}:`, error);
+            templates[category] = [];
+          }
+        }
+        setCategoryTemplates(templates);
       } else if (activeTab === 'improvements') {
         const improvementsData = await adminDashboardApi.getSkillImprovements();
         setImprovements(improvementsData.improvements);
@@ -274,34 +292,78 @@ export const AdminDashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const handleImportSkillsClick = () => {
-    fileInputRef.current?.click();
+  const handleCategoryImportClick = (category: string) => {
+    categoryFileInputRefs.current[category]?.click();
   };
 
-  const handleSkillsFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCategoryFileChange = async (category: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setUploadingSkills(true);
+    setUploadingCategory(category);
     setUploadError('');
     setSkillsUploadResult(null);
 
     try {
-      const result = await adminApi.uploadSkills(file);
+      const result = await adminApi.importCategoryTemplates(file, category);
       setSkillsUploadResult(result);
-      // Reload skills overview if on skills tab
-      if (activeTab === 'skills') {
-        loadDashboardData();
-      }
+      // Reload category templates
+      loadDashboardData();
     } catch (err: any) {
-      setUploadError(err.response?.data?.detail || 'Failed to upload skills file');
+      setUploadError(err.response?.data?.detail || 'Failed to upload category template file');
     } finally {
-      setUploadingSkills(false);
+      setUploadingCategory(null);
       // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      if (categoryFileInputRefs.current[category]) {
+        categoryFileInputRefs.current[category]!.value = '';
       }
     }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+
+    setAddingCategory(true);
+    setUploadError('');
+
+    try {
+      await categoriesApi.createCategory(newCategoryName.trim());
+      setNewCategoryName('');
+      setShowAddCategory(false);
+      // Reload categories
+      loadDashboardData();
+    } catch (err: any) {
+      setUploadError(err.response?.data?.detail || 'Failed to create category');
+    } finally {
+      setAddingCategory(false);
+    }
+  };
+
+  const handleToggleMandatory = async (category: string, templateId: number, currentStatus: boolean) => {
+    try {
+      const result = await categoriesApi.updateMandatoryStatus(category, templateId, !currentStatus);
+      
+      if (result.employees_updated !== undefined && result.employees_updated > 0) {
+        setSkillsUploadResult({
+          message: result.message,
+          rows_processed: result.employees_updated,
+          rows_created: result.employees_updated,
+          rows_updated: 0,
+        });
+      }
+      
+      // Reload templates
+      loadDashboardData();
+    } catch (err: any) {
+      setUploadError(err.response?.data?.detail || 'Failed to update mandatory status');
+    }
+  };
+
+  const toggleSubcategory = (key: string) => {
+    setExpandedSubcategories(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   if (loading && activeTab === 'overview') {
@@ -455,6 +517,21 @@ export const AdminDashboard: React.FC = () => {
             <div>
               <div className="text-sm font-semibold text-gray-900">Improvements</div>
               <div className="text-xs text-gray-500">Track improvements</div>
+            </div>
+              </button>
+              <button
+            onClick={() => navigate('/admin/learning')}
+            className="flex items-center gap-3 rounded-2xl shadow-xl hover:shadow-2xl p-4 transition bg-white"
+          >
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-purple-600">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+              </svg>
+            </span>
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Learning</div>
+              <div className="text-xs text-gray-500">Manage courses</div>
             </div>
               </button>
         </div>
@@ -999,212 +1076,253 @@ export const AdminDashboard: React.FC = () => {
         {/* Skills Tab */}
         {activeTab === 'skills' && (
           <div>
-            <div className="flex justify-end items-center gap-2 mb-4">
-              <button
-                onClick={handleImportSkillsClick}
-                disabled={uploadingSkills}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploadingSkills ? 'Uploading...' : 'Import Skills'}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleSkillsFileChange}
-                className="hidden"
-              />
-            </div>
-            <div className="mb-4 flex gap-4 items-center flex-wrap">
-              <div className="flex-1 min-w-[200px]">
+            {/* Add Category and Search Section */}
+            <div className="mb-6 flex gap-4 items-center">
+              <div className="flex-1">
                 <input
                   type="text"
-                  placeholder="Search skills by name, category, or description..."
-                  value={skillSearchQuery}
-                  onChange={(e) => setSkillSearchQuery(e.target.value)}
+                  placeholder="Search categories..."
+                  value={categorySearchQuery}
+                  onChange={(e) => setCategorySearchQuery(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div className="min-w-[200px]">
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => {
-                    setCategoryFilter(e.target.value);
-                    setSkillCategoryFilter(''); // Reset skill category when employee category changes
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">All Employee Categories</option>
-                  {employeeCategories.sort().map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </div>
-              {categoryFilter && (
-                <div className="min-w-[200px]">
-                  <select
-                    value={skillCategoryFilter}
-                    onChange={(e) => setSkillCategoryFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="">All Skill Categories</option>
-                    {skillCategories.sort().map((skillCat) => (
-                      <option key={skillCat} value={skillCat}>{skillCat}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end items-center gap-2 mb-2">
-              <label className="text-sm text-gray-600">Skills per page</label>
-              <select
-                value={skillsPerPage}
-                onChange={(e) => { setSkillsPerPage(Number(e.target.value)); setSkillsPage(1); }}
-                className="px-2 py-1 border border-gray-300 rounded-lg bg-white text-sm"
+              <button
+                onClick={() => setShowAddCategory(!showAddCategory)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium whitespace-nowrap"
               >
-                {[5,10,20,50,100].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
+                + Add Category
+              </button>
             </div>
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading skills...</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {skillsOverview
-                  .filter((item) => {
-                    // Category filtering is now done on the backend
-                    // Only filter by search query on frontend
-                    if (skillSearchQuery) {
-                      const query = skillSearchQuery.toLowerCase();
-                      return (
-                        item.skill.name?.toLowerCase().includes(query) ||
-                        item.skill.category?.toLowerCase().includes(query) ||
-                        item.skill.description?.toLowerCase().includes(query)
-                      );
-                    }
-                    return true;
-                  })
-                  .slice((skillsPage-1)*skillsPerPage, (skillsPage-1)*skillsPerPage + skillsPerPage)
-                  .map((item) => {
-                  // Prepare data for the chart
-                  const chartData = [
-                    {
-                      rating: 'Beginner',
-                      employees: item.rating_breakdown.Beginner || 0,
-                    },
-                    {
-                      rating: 'Developing',
-                      employees: item.rating_breakdown.Developing || 0,
-                    },
-                    {
-                      rating: 'Intermediate',
-                      employees: item.rating_breakdown.Intermediate || 0,
-                    },
-                    {
-                      rating: 'Advanced',
-                      employees: item.rating_breakdown.Advanced || 0,
-                    },
-                    {
-                      rating: 'Expert',
-                      employees: item.rating_breakdown.Expert || 0,
-                    },
-                  ];
 
-                  return (
-                    <div key={item.skill.id} className="bg-white rounded-lg shadow-md p-4">
-                      <div className="mb-3">
-                        <h3 className="text-base font-semibold text-gray-800">{item.skill.name}</h3>
-                        {item.skill.category && (
-                          <span className="inline-block mt-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                            {item.skill.category}
-                          </span>
-                        )}
-                        {item.skill.description && (
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{item.skill.description}</p>
-                        )}
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
-                          <span>Total: <strong className="text-gray-900">{item.total_employees}</strong></span>
-                          <span>Existing: <strong className="text-gray-900">{item.existing_skills_count}</strong></span>
-                          <span>Interested: <strong className="text-gray-900">{item.interested_skills_count}</strong></span>
-                        </div>
-                      </div>
-                      
-                      {/* Bar Chart */}
-                      <div className="mt-3">
-                        <h4 className="text-xs font-medium text-gray-700 mb-2">Rating Distribution</h4>
-                        <ResponsiveContainer width="100%" height={150}>
-                          <BarChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                              dataKey="rating" 
-                              tick={{ fontSize: 10 }}
-                              angle={-45}
-                              textAnchor="end"
-                              height={50}
-                            />
-                            <YAxis 
-                              tick={{ fontSize: 10 }}
-                              allowDecimals={false}
-                              width={40}
-                            />
-                            <Tooltip />
-                            <Bar dataKey="employees" fill="#3b82f6" name="Employees" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {skillsOverview.filter((item) => {
-                  // Filter by category
-                  if (categoryFilter && item.skill.category !== categoryFilter) {
-                    return false;
-                  }
-                  // Filter by search query
-                  if (skillSearchQuery) {
-                    const query = skillSearchQuery.toLowerCase();
-                    return (
-                      item.skill.name?.toLowerCase().includes(query) ||
-                      item.skill.category?.toLowerCase().includes(query) ||
-                      item.skill.description?.toLowerCase().includes(query)
-                    );
-                  }
-                  return true;
-                }).length === 0 && (
-                  <div className="col-span-full text-center py-8 text-gray-500">No skills found</div>
-                )}
-                <div className="col-span-full flex justify-end items-center gap-2">
-                  {(() => {
-                    const total = skillsOverview.filter((item) => {
-                      if (categoryFilter && item.skill.category !== categoryFilter) return false;
-                      if (skillSearchQuery) {
-                        const query = skillSearchQuery.toLowerCase();
-                        return (
-                          item.skill.name?.toLowerCase().includes(query) ||
-                          item.skill.category?.toLowerCase().includes(query) ||
-                          item.skill.description?.toLowerCase().includes(query)
-                        );
+            {/* Add Category Form */}
+            {showAddCategory && (
+              <div className="mb-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h3 className="text-lg font-semibold mb-3 text-gray-800">Create New Category</h3>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    placeholder="Enter category name (e.g., Technical, P&C, Consultancy)"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleAddCategory}
+                    disabled={addingCategory || !newCategoryName.trim()}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {addingCategory ? 'Creating...' : 'Create'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddCategory(false);
+                      setNewCategoryName('');
+                    }}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loading ? (
+              <div className="text-center py-8 text-gray-500">Loading category templates...</div>
+            ) : (
+              <div className="space-y-6">
+                {employeeCategories.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No categories found. Click "Add Category" to create one.
+                  </div>
+                ) : (
+                  employeeCategories
+                    .filter((category) => {
+                      if (categorySearchQuery) {
+                        return category.toLowerCase().includes(categorySearchQuery.toLowerCase());
                       }
                       return true;
-                    }).length;
-                    const totalPages = Math.max(1, Math.ceil(total / skillsPerPage));
-                    return (
-                      <>
-                        <button
-                          onClick={() => setSkillsPage(p => Math.max(1, p - 1))}
-                          className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm"
-                          disabled={skillsPage <= 1}
-                        >Prev</button>
-                        <span className="text-sm text-gray-600">Page {skillsPage} of {totalPages}</span>
-                        <button
-                          onClick={() => setSkillsPage(p => Math.min(totalPages, p + 1))}
-                          className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm"
-                          disabled={skillsPage >= totalPages}
-                        >Next</button>
-                      </>
-                    );
-                  })()}
-                </div>
+                    })
+                    .sort()
+                    .map((category) => {
+                      const templates = categoryTemplates[category] || [];
+                      const isUploading = uploadingCategory === category;
+                      
+                      // Group skills by skill category
+                      const groupedSkills: Record<string, any[]> = {};
+                      templates.forEach((template) => {
+                        const skillCategory = template.skill?.category || 'Uncategorized';
+                        if (!groupedSkills[skillCategory]) {
+                          groupedSkills[skillCategory] = [];
+                        }
+                        groupedSkills[skillCategory].push(template);
+                      });
+                      
+                      return (
+                        <div key={category} className="bg-white rounded-lg shadow-md overflow-hidden">
+                          {/* Category Header */}
+                          <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <h2 className="text-xl font-bold text-gray-800">{category}</h2>
+                              <span className="text-sm text-gray-600">
+                                {templates.length} skill{templates.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleCategoryImportClick(category)}
+                              disabled={isUploading}
+                              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                            >
+                              {isUploading ? 'Uploading...' : 'Import Skills'}
+                            </button>
+                            <input
+                              ref={(el) => { categoryFileInputRefs.current[category] = el; }}
+                              type="file"
+                              accept=".xlsx,.xls"
+                              onChange={(e) => handleCategoryFileChange(category, e)}
+                              className="hidden"
+                            />
+                          </div>
+                          
+                          {/* Skills Table */}
+                          {templates.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 bg-gray-50">
+                              No skills in this category template. Click "Import Skills" to add skills.
+                            </div>
+                          ) : (
+                            <div>
+                              {Object.entries(groupedSkills).sort(([a], [b]) => a.localeCompare(b)).map(([skillCategory, skillTemplates]) => {
+                                const subcategoryKey = `${category}-${skillCategory}`;
+                                const isExpanded = expandedSubcategories[subcategoryKey] === true; // Default to collapsed
+                                
+                                return (
+                                  <div key={skillCategory} className="border-b border-gray-200 last:border-b-0">
+                                    {/* Skill Category Header - Clickable */}
+                                    <div 
+                                      className="bg-gray-50 px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-between"
+                                      onClick={() => toggleSubcategory(subcategoryKey)}
+                                    >
+                                      <h3 className="text-base font-bold text-gray-800">{skillCategory}</h3>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-600">
+                                          {skillTemplates.length} skill{skillTemplates.length !== 1 ? 's' : ''}
+                                        </span>
+                                        <svg 
+                                          className={`w-5 h-5 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                          fill="none" 
+                                          stroke="currentColor" 
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Table - Collapsible */}
+                                    {isExpanded && (
+                                      <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Skill
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                                            Mandatory
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                            Employees
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                            Beginner
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                            Developing
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                            Intermediate
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                            Advanced
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                            Expert
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="bg-white divide-y divide-gray-200">
+                                        {skillTemplates.map((template) => (
+                                          <tr key={template.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4">
+                                              <div className="text-sm font-medium text-gray-900">
+                                                {template.skill?.name || 'Unknown Skill'}
+                                              </div>
+                                              {template.skill?.description && (
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                  {template.skill.description}
+                                                </div>
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                              {template.is_required ? (
+                                                <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">
+                                                  Mandatory Skill
+                                                </span>
+                                              ) : (
+                                                <input
+                                                  type="checkbox"
+                                                  id={`mandatory-${template.id}`}
+                                                  checked={false}
+                                                  onChange={() => handleToggleMandatory(category, template.id, template.is_required)}
+                                                  className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 cursor-pointer"
+                                                  title="Mark as Mandatory"
+                                                />
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-semibold text-gray-900">
+                                              {template.total_employees}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                                              {template.rating_breakdown?.Beginner || 0}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                                              {template.rating_breakdown?.Developing || 0}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                                              {template.rating_breakdown?.Intermediate || 0}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                                              {template.rating_breakdown?.Advanced || 0}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                                              {template.rating_breakdown?.Expert || 0}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                )}
+                {employeeCategories.filter((category) => {
+                  if (categorySearchQuery) {
+                    return category.toLowerCase().includes(categorySearchQuery.toLowerCase());
+                  }
+                  return true;
+                }).length === 0 && categorySearchQuery && (
+                  <div className="text-center py-8 text-gray-500">
+                    No categories found matching "{categorySearchQuery}"
+                  </div>
+                )}
               </div>
             )}
           </div>

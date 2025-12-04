@@ -24,6 +24,7 @@ export const Login: React.FC = () => {
       if (response.user.must_change_password) {
         navigate('/change-password');
       } else {
+        // Redirect to dashboard (profile) as landing page for regular users, admin dashboard for admins
         navigate(response.user.is_admin ? '/admin/dashboard' : '/dashboard');
       }
     } catch (err: any) {

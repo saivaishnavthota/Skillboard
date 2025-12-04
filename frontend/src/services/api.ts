@@ -64,6 +64,7 @@ export interface EmployeeSkill {
   years_experience?: number;
   is_interested?: boolean;
   notes?: string;
+  is_custom?: boolean;
   employee?: {
     id: number;
     employee_id: string;
@@ -115,6 +116,11 @@ export interface UploadResponse {
 export const skillsApi = {
   getAll: async (): Promise<Skill[]> => {
     const response = await api.get<Skill[]>('/api/skills/');
+    return response.data;
+  },
+  getAllSimple: async (limit: number = 1000): Promise<Skill[]> => {
+    // Use the simple /all endpoint that doesn't do category filtering
+    const response = await api.get<Skill[]>('/api/skills/all', { params: { limit } });
     return response.data;
   },
   getById: async (id: number): Promise<Skill> => {
@@ -186,6 +192,7 @@ export const userSkillsApi = {
     years_experience?: number;
     is_interested?: boolean;
     notes?: string;
+    is_custom?: boolean;
   }): Promise<EmployeeSkill> => {
     const response = await api.post<EmployeeSkill>('/api/user-skills/me', data);
     return response.data;
@@ -284,6 +291,17 @@ export const adminApi = {
     });
     return response.data;
   },
+  importCategoryTemplates: async (file: File, category: string): Promise<UploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', category);
+    const response = await api.post<UploadResponse>('/api/admin/import-category-templates', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 // Admin Dashboard API
@@ -326,6 +344,7 @@ export interface DashboardStats {
 // Bands API
 export interface SkillGap {
   skill_id: number;
+  employee_skill_id: number;
   skill_name: string;
   skill_category?: string;
   current_rating_text?: string;
@@ -334,6 +353,7 @@ export interface SkillGap {
   required_rating_number: number;
   gap: number;
   is_required: boolean;
+  notes?: string;
 }
 
 export interface BandAnalysis {
@@ -354,8 +374,24 @@ export const categoriesApi = {
     const response = await api.get<string[]>('/api/categories/');
     return response.data;
   },
+  createCategory: async (categoryName: string): Promise<{ message: string; category: string }> => {
+    const response = await api.post('/api/categories/create', null, {
+      params: { category_name: categoryName }
+    });
+    return response.data;
+  },
   getTemplate: async (category: string): Promise<any[]> => {
     const response = await api.get(`/api/categories/${category}/template`);
+    return response.data;
+  },
+  getTemplateWithStats: async (category: string): Promise<any[]> => {
+    const response = await api.get(`/api/categories/${category}/template-with-stats`);
+    return response.data;
+  },
+  updateMandatoryStatus: async (category: string, templateId: number, isRequired: boolean): Promise<{ message: string; employees_updated?: number }> => {
+    const response = await api.patch(`/api/categories/${category}/template/${templateId}/mandatory`, null, {
+      params: { is_required: isRequired }
+    });
     return response.data;
   },
   getSkillCategories: async (employeeCategory: string): Promise<string[]> => {
@@ -375,6 +411,160 @@ export const bandsApi = {
   },
   getEmployeeAnalysis: async (employeeId: string): Promise<BandAnalysis> => {
     const response = await api.get<BandAnalysis>(`/api/bands/employee/${employeeId}/analysis`);
+    return response.data;
+  },
+};
+
+// Learning Platform API
+export interface Course {
+  id: number;
+  title: string;
+  description?: string;
+  skill_id?: number;
+  skill_name?: string;
+  external_url?: string;
+  is_mandatory: boolean;
+  created_at: string;
+}
+
+export interface CourseAssignment {
+  id: number;
+  course_id: number;
+  course_title: string;
+  course_external_url?: string;
+  employee_id: number;
+  employee_name: string;
+  assigned_at: string;
+  due_date?: string;
+  status: 'Not Started' | 'In Progress' | 'Completed';
+  started_at?: string;
+  completed_at?: string;
+  certificate_url?: string;
+  notes?: string;
+}
+
+export const learningApi = {
+  // Admin endpoints
+  createCourse: async (course: {
+    title: string;
+    description?: string;
+    skill_id?: number;
+    external_url?: string;
+    is_mandatory: boolean;
+  }): Promise<Course> => {
+    const response = await api.post<Course>('/api/learning/courses', course);
+    return response.data;
+  },
+  
+  getAllCourses: async (): Promise<Course[]> => {
+    const response = await api.get<Course[]>('/api/learning/courses');
+    return response.data;
+  },
+  
+  assignCourse: async (assignment: {
+    course_id: number;
+    employee_ids: number[];
+    due_date?: string;
+  }): Promise<{ message: string; assigned: number; skipped: number }> => {
+    const response = await api.post('/api/learning/assignments', assignment);
+    return response.data;
+  },
+  
+  getAllAssignments: async (): Promise<CourseAssignment[]> => {
+    const response = await api.get<CourseAssignment[]>('/api/learning/assignments/all');
+    return response.data;
+  },
+  
+  deleteCourse: async (courseId: number): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/learning/courses/${courseId}`);
+    return response.data;
+  },
+  
+  // Employee endpoints
+  getMyAssignments: async (): Promise<CourseAssignment[]> => {
+    const response = await api.get<CourseAssignment[]>('/api/learning/my-assignments');
+    return response.data;
+  },
+  
+  startCourse: async (assignmentId: number): Promise<{ message: string }> => {
+    const response = await api.patch(`/api/learning/assignments/${assignmentId}/start`);
+    return response.data;
+  },
+  
+  completeCourse: async (
+    assignmentId: number,
+    certificate?: File,
+    notes?: string
+  ): Promise<{ message: string; certificate_url?: string }> => {
+    const formData = new FormData();
+    if (certificate) {
+      formData.append('certificate', certificate);
+    }
+    if (notes) {
+      formData.append('notes', notes);
+    }
+    const response = await api.patch(`/api/learning/assignments/${assignmentId}/complete`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Auto-assignment endpoints
+  autoAssignBySkillGap: async (): Promise<{
+    message: string;
+    assigned: number;
+    skipped: number;
+    details: Array<{
+      employee_id: string;
+      employee_name: string;
+      course_title: string;
+      skill_name: string;
+      current_level: string;
+      required_level: string;
+    }>;
+  }> => {
+    const response = await api.post('/api/learning/auto-assign-by-skill-gap');
+    return response.data;
+  },
+
+  autoAssignForEmployee: async (employeeId: number): Promise<{
+    message: string;
+    assigned: number;
+    skipped: number;
+    details: Array<{
+      course_title: string;
+      skill_name: string;
+      current_level: string;
+      required_level: string;
+    }>;
+  }> => {
+    const response = await api.post(`/api/learning/auto-assign-for-employee/${employeeId}`);
+    return response.data;
+  },
+
+  getSkillGapReport: async (): Promise<Array<{
+    employee_id: number;
+    employee_name: string;
+    band: string;
+    skill_gaps: Array<{
+      skill_id: number;
+      skill_name: string;
+      current_level: string;
+      required_level: string;
+      assigned_courses: Array<{
+        course_id: number;
+        course_title: string;
+        status: string;
+      }>;
+      available_courses: Array<{
+        course_id: number;
+        course_title: string;
+      }>;
+    }>;
+  }>> => {
+    const response = await api.get('/api/learning/skill-gap-report');
     return response.data;
   },
 };

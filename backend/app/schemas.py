@@ -61,6 +61,7 @@ class EmployeeSkillCreate(EmployeeSkillBase):
     skill_name: str
     is_interested: Optional[bool] = False
     notes: Optional[str] = None
+    is_custom: Optional[bool] = False
 
 
 class EmployeeSkillCreateMe(BaseModel):
@@ -70,6 +71,7 @@ class EmployeeSkillCreateMe(BaseModel):
     years_experience: Optional[float] = None
     is_interested: Optional[bool] = False
     notes: Optional[str] = None
+    is_custom: Optional[bool] = False
 
 
 class EmployeeSkillUpdate(BaseModel):
@@ -85,6 +87,7 @@ class EmployeeSkill(EmployeeSkillBase):
     skill_id: int
     is_interested: bool
     notes: Optional[str] = None
+    is_custom: bool
     employee: Employee
     skill: Skill
 

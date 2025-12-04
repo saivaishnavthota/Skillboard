@@ -53,8 +53,9 @@ def create_my_skill(
     # Get or create skill
     skill = crud.upsert_skill(db, employee_skill.skill_name)
     
-    # Validate skill is in employee's category template if category is set
-    if employee.category:
+    # Validate skill is in employee's category template if category is set and not a custom skill
+    is_custom = employee_skill.is_custom or False
+    if employee.category and not is_custom:
         from app.db.models import CategorySkillTemplate
         template_entry = (
             db.query(CategorySkillTemplate)
@@ -65,10 +66,8 @@ def create_my_skill(
             .first()
         )
         if not template_entry:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Skill '{employee_skill.skill_name}' is not available for your category '{employee.category}'. Please select a skill from your category template."
-            )
+            # Skill not in template - mark as custom
+            is_custom = True
     
     # Create or update employee-skill mapping
     # If is_interested is True, rating should be None
@@ -83,6 +82,7 @@ def create_my_skill(
         employee_skill.years_experience,
         is_interested=employee_skill.is_interested or False,
         notes=employee_skill.notes,
+        is_custom=is_custom,
     )
 
 
@@ -109,6 +109,7 @@ def create_employee_skill(
         employee_skill.years_experience,
         is_interested=employee_skill.is_interested or False,
         notes=employee_skill.notes,
+        is_custom=employee_skill.is_custom or False,
     )
 
 

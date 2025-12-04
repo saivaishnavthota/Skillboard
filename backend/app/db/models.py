@@ -78,6 +78,7 @@ class EmployeeSkill(Base):
     notes = Column(String, nullable=True)  # Optional notes field
     match_score = Column(Float, nullable=True)  # For fuzzy matching during import
     needs_review = Column(Boolean, default=False, nullable=False)  # Flag for admin review
+    is_custom = Column(Boolean, default=False, nullable=False)  # True if skill was added by user outside template
 
     # Relationships
     employee = relationship("Employee", back_populates="employee_skills")
@@ -143,5 +144,56 @@ class CategorySkillTemplate(Base):
     # Unique constraint: one template entry per category-skill pair
     __table_args__ = (
         UniqueConstraint("category", "skill_id", name="uq_category_skill_template"),
+    )
+
+
+class CourseStatusEnum(str, enum.Enum):
+    """Course completion status."""
+    NOT_STARTED = "Not Started"
+    IN_PROGRESS = "In Progress"
+    COMPLETED = "Completed"
+
+
+class Course(Base):
+    """Learning courses/certifications."""
+    __tablename__ = "courses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=True)  # Associated skill
+    external_url = Column(String, nullable=True)  # Link to external learning platform
+    is_mandatory = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Admin who created it
+
+    # Relationships
+    skill = relationship("Skill")
+    assignments = relationship("CourseAssignment", back_populates="course")
+
+
+class CourseAssignment(Base):
+    """Course assignments to employees."""
+    __tablename__ = "course_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    assigned_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Admin who assigned
+    assigned_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    due_date = Column(DateTime, nullable=True)
+    status = Column(SQLEnum(CourseStatusEnum, native_enum=False, length=50), default=CourseStatusEnum.NOT_STARTED, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    certificate_url = Column(String, nullable=True)  # Uploaded certificate file path/URL
+    notes = Column(String, nullable=True)
+
+    # Relationships
+    course = relationship("Course", back_populates="assignments")
+    employee = relationship("Employee")
+
+    # Unique constraint: one assignment per employee-course pair
+    __table_args__ = (
+        UniqueConstraint("employee_id", "course_id", name="uq_employee_course_assignment"),
     )
 

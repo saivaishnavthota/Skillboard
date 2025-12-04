@@ -90,6 +90,7 @@ def calculate_employee_band(db: Session, employee_id: int) -> Optional[str]:
 
 class SkillGap(BaseModel):
     skill_id: int
+    employee_skill_id: int  # ID of the EmployeeSkill record for updating
     skill_name: str
     skill_category: Optional[str]
     current_rating_text: Optional[str]
@@ -98,6 +99,7 @@ class SkillGap(BaseModel):
     required_rating_number: int
     gap: int  # current - required (positive = above requirement, negative = below requirement)
     is_required: bool
+    notes: Optional[str]  # Improvement plan/notes
 
 
 class BandAnalysis(BaseModel):
@@ -269,6 +271,7 @@ def get_employee_band_analysis(
         
         skill_gaps.append(SkillGap(
             skill_id=skill.id,
+            employee_skill_id=emp_skill.id,
             skill_name=skill.name,
             skill_category=skill.category,
             current_rating_text=current_rating_text,
@@ -277,6 +280,7 @@ def get_employee_band_analysis(
             required_rating_number=required_rating_num,
             gap=gap,
             is_required=requirement.is_required if requirement else True,
+            notes=emp_skill.notes,
         ))
     
     return BandAnalysis(

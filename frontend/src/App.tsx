@@ -8,6 +8,8 @@ import { OnboardingMapSkills } from './pages/OnboardingMapSkills';
 import { AdminUsers } from './pages/AdminUsers';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { SkillGapBoard } from './pages/SkillGapBoard';
+import { EmployeeLearning } from './pages/EmployeeLearning';
+import { AdminLearning } from './pages/AdminLearning';
 import { PrivateRoute } from './components/PrivateRoute';
 import { authApi } from './services/api';
 
@@ -27,7 +29,23 @@ function App() {
           }
         />
         <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <EmployeeDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/onboarding"
+          element={
+            <PrivateRoute>
+              <OnboardingMapSkills />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/edit-skills"
           element={
             <PrivateRoute>
               <OnboardingMapSkills />
@@ -59,10 +77,28 @@ function App() {
           }
         />
         <Route
+          path="/learning"
+          element={
+            <PrivateRoute>
+              <EmployeeLearning />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/learning"
+          element={
+            <PrivateRoute>
+              <AdminLearning />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/"
           element={(() => {
             const user = authApi.getUser();
-            const to = user?.is_admin ? '/admin/dashboard' : '/dashboard';
+            // Redirect to dashboard (profile) as landing page
+            if (!user) return <Navigate to="/login" replace />;
+            const to = user.is_admin ? '/admin/dashboard' : '/dashboard';
             return <Navigate to={to} replace />;
           })()}
         />
